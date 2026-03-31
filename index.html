@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mini Lexical Analyzer</title>
+    <!-- PrismJS Theme (Dark) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body class="h-screen flex flex-col overflow-hidden relative">
+    <!-- Token Animation Overlay -->
+    <div id="token-anim-overlay" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-bgMain/95 backdrop-blur-xl opacity-0 transition-opacity duration-500">
+      <div class="max-w-5xl w-full p-8 flex flex-col items-center">
+        <div class="relative flex items-center justify-center mb-16">
+          <div class="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full"></div>
+          <h3 class="text-blue-400 font-mono text-sm tracking-[0.3em] uppercase animate-pulse relative z-10 font-bold border border-blue-500/30 bg-blue-500/10 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.3)]">Analyzing Stream</h3>
+        </div>
+        
+        <div id="token-anim-container" class="flex flex-wrap justify-center gap-4 md:gap-6 text-2xl md:text-5xl font-mono text-zinc-300">
+           <!-- Tokens injected here dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Animated Starfield Background -->
+    <canvas id="bg-canvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></canvas>
+
+    <!-- Header -->
+    <header class="py-4 px-6 border-b border-borderSubtle flex justify-between items-center bg-bgMain/80 backdrop-blur-md z-10 shrink-0">
+      <div class="flex items-center gap-3 cursor-default group">
+        <div class="logo-container w-8 h-8 rounded-lg bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 flex items-center justify-center transition-transform duration-300">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-blue-400 group-hover:text-purple-400 transition-colors duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </div>
+        <h1 class="text-lg font-bold tracking-tight animate-shimmer-text">
+          Lexical Analyzer
+        </h1>
+      </div>
+      <div class="flex gap-3">
+        <button id="btn-reset" class="btn-secondary">Reset</button>
+        <button id="btn-generate-tokens" class="btn-secondary">Generate Tokens</button>
+        <button id="btn-generate-nfa" class="btn-primary">Generate NFA</button>
+      </div>
+    </header>
+
+    <!-- Main Content Split Screen -->
+    <main class="flex-1 flex flex-col md:flex-row p-4 md:p-6 overflow-hidden bg-transparent z-10">
+      
+      <!-- Left Panel -->
+      <section id="left-panel" class="flex-1 flex flex-col gap-4 md:gap-6 overflow-y-auto px-2 min-w-[250px] w-1/2">
+        
+        <!-- User Input Section -->
+        <div class="glass-card p-4 md:p-5 flex flex-col h-1/2 min-h-[200px] relative">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-zinc-100">Source Code</h2>
+            <div class="text-xs text-zinc-500 font-mono">input.js</div>
+          </div>
+          <div class="relative flex-1 rounded-lg border border-borderSubtle bg-[#0e0e11] overflow-hidden group">
+            <textarea id="code-input" class="absolute inset-0 w-full h-full p-4 bg-transparent text-transparent caret-[#3b82f6] resize-none outline-none z-10" spellcheck="false">int x = 10 + y;</textarea>
+            <pre aria-hidden="true" class="absolute inset-0 w-full h-full m-0 p-4 overflow-hidden pointer-events-none text-zinc-300"><code id="code-highlight" class="language-clike">int x = 10 + y;</code></pre>
+          </div>
+        </div>
+
+        <!-- Token Definition Panel -->
+        <div class="glass-card p-4 md:p-5 flex flex-col flex-1 min-h-[250px]">
+          <div class="flex justify-between items-center mb-4">
+             <h2 class="text-sm font-semibold text-zinc-100">Token Rules</h2>
+             <button id="btn-add-rule" class="text-xs px-2.5 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors flex items-center gap-1">
+               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+               Add Rule
+             </button>
+          </div>
+          <div id="rules-container" class="space-y-2 overflow-y-auto flex-1 pr-2">
+            <!-- Dynamic Rules Go Here -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Resizer -->
+      <div id="resizer" class="hidden md:flex flex-col justify-center items-center w-6 cursor-col-resize group z-10 shrink-0">
+        <div class="h-8 w-1 rounded-full bg-borderSubtle group-hover:bg-zinc-500 transition-colors duration-200"></div>
+      </div>
+
+      <!-- Right Panel -->
+      <section id="right-panel" class="flex-1 flex flex-col gap-4 md:gap-0 overflow-y-auto px-2 min-w-[250px]">
+        
+        <!-- NFA Visualization -->
+        <div id="nfa-card" class="glass-card flex flex-col flex-[1.5] min-h-[200px] relative overflow-hidden shrink-0 mt-4 md:mt-6">
+          <div class="px-4 py-3 border-b border-borderSubtle flex justify-between items-center bg-bgCard">
+            <h2 class="text-sm font-semibold text-zinc-100">NFA Visualization</h2>
+            <div class="flex items-center gap-3">
+              <div class="text-[10px] text-zinc-500 font-mono tracking-wider uppercase">Vis.Network</div>
+              <button id="btn-fullscreen" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Toggle Fullscreen">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="nfa-scroll-container" class="flex-1 w-full bg-[#0e0e11] overflow-auto relative">
+              <div id="nfa-network" class="min-w-full min-h-full cursor-default border-none outline-none"></div>
+          </div>
+          
+          <!-- Loading Overlay -->
+          <div id="nfa-loading" class="absolute inset-0 bg-[#0e0e11]/80 backdrop-blur-[2px] flex items-center justify-center hidden z-20">
+             <div class="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-zinc-200"></div>
+          </div>
+          
+          <!-- Graph Legend -->
+          <div class="absolute bottom-4 right-4 bg-[#111113]/90 backdrop-blur-md border border-borderSubtle rounded-lg p-3 z-10 pointer-events-none flex flex-col gap-2 shadow-lg">
+            <h3 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Legend</h3>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full border-2 border-[#3f3f46] bg-[#18181b]"></div>
+              <span class="text-xs text-zinc-400">Normal State</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full border-[3px] border-[#10b981] bg-[#022c22] shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+              <span class="text-xs text-zinc-400">Final (Accepting)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-4 h-[2px] border-t-2 border-dashed border-[#a855f7]"></div>
+              <span class="text-xs text-zinc-400">&epsilon;-transition</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-4 h-[2px] bg-[#0ea5e9]"></div>
+              <span class="text-xs text-zinc-400">Normal transition</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vertical Resizer -->
+        <div id="resizer-v" class="hidden md:flex flex-col justify-center items-center h-6 cursor-row-resize group z-10 shrink-0 select-none">
+          <div class="w-8 h-1 rounded-full bg-borderSubtle group-hover:bg-zinc-500 transition-colors duration-200"></div>
+        </div>
+
+        <!-- Token Output -->
+        <div class="glass-card p-4 md:p-5 flex flex-col flex-1 min-h-[200px] overflow-hidden mb-4 md:mb-6 shrink">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-zinc-100">Token Output</h2>
+            <div class="flex items-center gap-2">
+              <span id="token-count-badge" class="px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-xs font-medium text-zinc-300 hidden">0 tokens</span>
+              <span class="text-xs text-zinc-500">Live generated</span>
+            </div>
+          </div>
+          <div class="overflow-y-auto flex-1 rounded-lg border border-borderSubtle bg-[#0e0e11]">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-zinc-900/50 sticky top-0 backdrop-blur-md border-b border-borderSubtle">
+                <tr>
+                  <th class="px-4 py-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider w-1/3">Type</th>
+                  <th class="px-4 py-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Lexeme</th>
+                </tr>
+              </thead>
+              <tbody id="tokens-tbody" class="divide-y divide-borderSubtle">
+                <tr><td colspan="2" class="p-4 text-center text-zinc-500 text-sm italic">No tokens generated yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
